@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: Vector query",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.query",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Debug: Wikipedia ingestion",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.ingest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

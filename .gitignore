@@ -1,0 +1,14 @@
+# Python virtual environment
+.venv/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Local databases and generated data
+data/
+chroma/
+
+# Local configuration and secrets
+config.yaml
+.env
