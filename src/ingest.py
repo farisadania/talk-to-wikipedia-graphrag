@@ -17,6 +17,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.config import load_config
 from src.vector_store import add_documents
 
+from src.graph_store import get_graph_driver
 
 TOPICS = [
     "Artificial intelligence",
@@ -90,6 +91,34 @@ def main() -> None:
 
     print(f"Loaded {len(documents)} articles; split them into {len(chunks)} chunks.")
     add_documents(chunks)
+
+    with get_graph_driver() as driver:
+        for chunk in chunks:
+            metadata = chunk.metadata
+            title = metadata["title"]
+            topic = metadata["topic"]
+            source = metadata["source"]
+
+            driver.execute_query(
+                """
+                MERGE (article:Article {title: $title})
+                SET article.source = $source
+
+                MERGE (topic:Topic {name: $topic})
+                MERGE (article)-[:HAS_TOPIC]->(topic)
+
+                MERGE (chunk:Chunk {
+                    text: $text,
+                    source: $source,
+                    title: $title
+                })
+                MERGE (article)-[:HAS_CHUNK]->(chunk)
+                """,
+                title=title,
+                topic=topic,
+                source=source,
+                text=chunk.page_content,
+            )
 
 
 if __name__ == "__main__":

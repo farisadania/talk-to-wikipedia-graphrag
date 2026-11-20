@@ -1,1 +1,7 @@
 pyyaml
+requests
+langchain-core
+langchain-text-splitters
+langchain-chroma
+langchain-ollama
+neo4j
