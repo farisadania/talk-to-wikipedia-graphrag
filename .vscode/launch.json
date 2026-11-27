@@ -14,7 +14,7 @@
       "name": "Debug: Wikipedia ingestion",
       "type": "debugpy",
       "request": "launch",
-      "module": "src.ingest",
+      "module": "src.run_ingestion",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true

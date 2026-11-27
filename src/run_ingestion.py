@@ -1,10 +1,11 @@
 '''
-Ingestion is run when you add or update the data.
+Ingestion is run whenever you add or update the data.
 
 It follows these steps:
 1. Fetches Wikipedia articles for the selected topics.
 2. Splits the article text into smaller chunks. Smaller pieces are easier to retrieve than whole articles.
 3. Sends the chunks to the vector store. Chroma's embedding function turns each chunk into a numerical representation, or embedding, and stores it along with the text and metadata such as its title and source URL.
+4. Create HTML report to plot ingestion statistics.
 '''
 
 import time
@@ -16,8 +17,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.config import load_config
 from src.vector_store import add_documents
-
 from src.graph_store import get_graph_driver
+from src.ingestion_report import create_ingestion_report
 
 TOPICS = [
     "Artificial intelligence",
@@ -30,6 +31,7 @@ TOPICS = [
 
 
 def fetch_article(title: str) -> Document:
+    # Fetch Wikipedia article
     response = requests.get(
         "https://en.wikipedia.org/w/api.php",
         params={
@@ -73,9 +75,11 @@ def fetch_article(title: str) -> Document:
 
 
 def main() -> None:
+    # Load config
     config = load_config()
     ingestion_config = config["ingestion"]
 
+    # Retrieve Wikipedia articles for each topic
     documents = []
     for topic in TOPICS:
         print(f"Loading Wikipedia topic: {topic}")
@@ -88,10 +92,12 @@ def main() -> None:
         chunk_overlap=ingestion_config["chunk_overlap"], # helps ensure that a sentence’s conclusion or a relevant passage isn’t lost because it happens to sit at the boundary
     )
     chunks = splitter.split_documents(documents)
-
     print(f"Loaded {len(documents)} articles; split them into {len(chunks)} chunks.")
+
+    # Convert chunks texts to vector and store in Chroma
     add_documents(chunks)
 
+    # 
     with get_graph_driver() as driver:
         for chunk in chunks:
             metadata = chunk.metadata
@@ -119,6 +125,10 @@ def main() -> None:
                 source=source,
                 text=chunk.page_content,
             )
+
+    # Create HTML report to visualise ingestion statistics from Neo4j
+    report_path = create_ingestion_report()
+    print(f"Ingestion statistics report created: {report_path}")
 
 
 if __name__ == "__main__":

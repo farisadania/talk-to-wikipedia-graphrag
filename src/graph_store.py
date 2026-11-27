@@ -4,6 +4,7 @@ from src.config import load_config
 
 
 def get_graph_driver():
+    # Load graph storage config
     config = load_config()["graph_store"]
 
     return GraphDatabase.driver(

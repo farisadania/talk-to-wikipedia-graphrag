@@ -5,3 +5,4 @@ langchain-text-splitters
 langchain-chroma
 langchain-ollama
 neo4j
+plotly
