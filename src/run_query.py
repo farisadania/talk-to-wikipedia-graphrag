@@ -1,12 +1,10 @@
-'''
-User question
-    ↓
-nomic-embed-text converts the question into a vector
-    ↓
-Chroma compares it with stored document vectors
-    ↓
-Chroma returns the closest chunks
-'''
+"""
+Answer questions about the indexed Wikipedia topics using hybrid retrieval.
+
+The pipeline converts the question with nomic-embed-text, retrieves similar
+chunks from Chroma, expands direct matches through Neo4j, and sends the
+combined evidence to a local Ollama chat model.
+"""
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
@@ -18,9 +16,11 @@ from src.graph_store import (
     get_graph_driver,
 )
 from src.vector_store import get_vector_store
+from src.project_report import record_query
 
 
 def main() -> None:
+    # Ask for a question and stop safely if no question is entered.
     question = input(
         "Ask a question about the indexed Wikipedia articles: "
     ).strip()
@@ -34,9 +34,10 @@ def main() -> None:
     vector_store = get_vector_store()
 
     try:
+        # Convert the question into a vector and find the closest chunk vectors in Chroma.
         direct_results = vector_store.similarity_search_with_score(
             question,
-            k=4,
+            k=4, # number of matches
         )
     except Exception as error:
         print(f"Chroma search failed: {error}")
@@ -84,6 +85,7 @@ def main() -> None:
         with get_graph_driver() as driver:
             seen_related_titles = set()
 
+            # Expand each article found by Chroma with graph context and related articles.
             for title in unique_titles:
                 article_context = find_article_context(driver, title)
                 related_articles = find_related_articles(driver, title)
@@ -189,7 +191,16 @@ def main() -> None:
             temperature=0,
         )
         response = chat.invoke(messages)
-        print(response.content)
+        answer = response.content
+
+        print(answer)
+
+        try:
+            report_path = record_query(question, answer)
+            print(f"\nProject report updated: {report_path}")
+        except Exception as error:
+            print(f"\nCould not update the HTML report: {error}")
+
     except Exception as error:
         print(f"Could not generate an answer with Ollama: {error}")
         print(

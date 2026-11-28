@@ -5,7 +5,7 @@
       "name": "Debug: Vector query",
       "type": "debugpy",
       "request": "launch",
-      "module": "src.query",
+      "module": "src.run_query",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true

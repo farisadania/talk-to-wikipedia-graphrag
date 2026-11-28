@@ -1,10 +1,18 @@
+"""
+Connect to Neo4j and provide graph queries and relationship operations.
+
+This module contains the shared graph connection, article-context, related-
+article, and topic-relationship functions used by the ingestion and query
+pipeline.
+"""
+
 from neo4j import GraphDatabase
 
 from src.config import load_config
 
 
 def get_graph_driver():
-    # Load graph storage config
+    # Load graph connection settings and create a Neo4j driver.
     config = load_config()["graph_store"]
 
     return GraphDatabase.driver(
@@ -14,12 +22,14 @@ def get_graph_driver():
 
 
 def verify_graph_connection() -> None:
+    # Verify that the configured Neo4j database is reachable.
     with get_graph_driver() as driver:
         driver.verify_connectivity()
         print("Connected to Neo4j.")
 
 
 def find_article_context(driver, title: str) -> list[dict]:
+    # Retrieve an article with its topics and all associated text chunks.
     records, _, _ = driver.execute_query(
     """
     MATCH (article:Article {title: $title})
@@ -38,6 +48,7 @@ def find_article_context(driver, title: str) -> list[dict]:
 
 
 def find_related_articles(driver, title: str, limit: int = 10) -> list[dict]:
+    # Find articles connected by shared topic or mentioned-topic relationships.
     records, _, _ = driver.execute_query(
         """
         MATCH (article:Article {title: $title})
@@ -67,6 +78,7 @@ def add_mentioned_topics(
     title: str,
     topics: list[str],
 ) -> None:
+    # Add a topic map entry to the graph for one Wikipedia article.
     driver.execute_query(
         """
         MATCH (article:Article {title: $title})

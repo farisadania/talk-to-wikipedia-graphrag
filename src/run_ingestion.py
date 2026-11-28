@@ -1,5 +1,5 @@
 '''
-Ingestion is run whenever you add or update the data.
+This module is run whenever you add or update the data.
 
 It follows these steps:
 1. Fetches Wikipedia articles for the selected topics.
@@ -18,7 +18,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.config import load_config
 from src.vector_store import add_documents
 from src.graph_store import get_graph_driver
-from src.ingestion_report import create_ingestion_report
+from src.project_report import create_report
 
 TOPICS = [
     "Artificial intelligence",
@@ -31,7 +31,7 @@ TOPICS = [
 
 
 def fetch_article(title: str) -> Document:
-    # Fetch Wikipedia article
+    # Fetch the article extract and source metadata from the Wikipedia API.
     response = requests.get(
         "https://en.wikipedia.org/w/api.php",
         params={
@@ -55,6 +55,7 @@ def fetch_article(title: str) -> Document:
             f"Response began: {response.text[:200]!r}"
         ) from error
 
+    # Wikipedia wraps matching pages in a nested dictionary, so take the first page.
     pages = data["query"]["pages"].values()
     page = next(iter(pages))
     text = page.get("extract", "")
@@ -63,6 +64,7 @@ def fetch_article(title: str) -> Document:
         raise RuntimeError(f"No article text returned for {title!r}")
 
     page_title = page["title"]
+    # Encode the title before placing it in a readable Wikipedia URL.
     url_title = quote(page_title.replace(" ", "_"))
     return Document(
         page_content=text,
@@ -75,7 +77,7 @@ def fetch_article(title: str) -> Document:
 
 
 def main() -> None:
-    # Load config
+    # Load ingestion settings before downloading and processing articles.
     config = load_config()
     ingestion_config = config["ingestion"]
 
@@ -94,10 +96,10 @@ def main() -> None:
     chunks = splitter.split_documents(documents)
     print(f"Loaded {len(documents)} articles; split them into {len(chunks)} chunks.")
 
-    # Convert chunks texts to vector and store in Chroma
+    # Convert chunk text to vectors and store the chunks in Chroma.
     add_documents(chunks)
 
-    # 
+    # Store each article, topic, and chunk as Neo4j nodes and relationships.
     with get_graph_driver() as driver:
         for chunk in chunks:
             metadata = chunk.metadata
@@ -127,7 +129,7 @@ def main() -> None:
             )
 
     # Create HTML report to visualise ingestion statistics from Neo4j
-    report_path = create_ingestion_report()
+    report_path = create_report()
     print(f"Ingestion statistics report created: {report_path}")
 
 

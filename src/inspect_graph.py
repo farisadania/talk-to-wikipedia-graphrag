@@ -1,7 +1,10 @@
+"""Print summaries and examples of the Neo4j graph contents."""
+
 from src.graph_store import get_graph_driver
 
 
 def print_query_results(title: str, query: str) -> None:
+    # Execute and print one read-only Cypher query with a section heading.
     print(f"\n{title}")
     print("-" * len(title))
 
@@ -17,6 +20,7 @@ def print_query_results(title: str, query: str) -> None:
 
 
 def main() -> None:
+    # Print several small read-only views of the nodes and relationships.
     print_query_results(
         "Node counts",
         """

@@ -111,7 +111,7 @@ The prompt displaying `(.venv)` indicates that the environment is active.
 Run project commands from the repository root, for example:
 
 ```powershell
-.\.venv\Scripts\python.exe -m src.query
+.\.venv\Scripts\python.exe -m src.run_query
 ```
 
 ### Step 2 — Install and Check Ollama
@@ -191,8 +191,8 @@ graph_store:
   database: "neo4j"
 
 ingestion:
-  chunk_size: 1000
-  chunk_overlap: 200
+  chunk_size: 800
+  chunk_overlap: 100
 ```
 
 > **Note:** Replace `YOUR_NEO4J_PASSWORD` with the actual password. Do not publish a real password in a public repository. For a deployed application, use environment variables or a secret manager.
@@ -302,7 +302,7 @@ def add_documents(documents):
 - `get_vector_store()` resolves the Chroma directory, creates it if needed, configures the embedding model, and returns the collection.
 - `add_documents()` stores document chunks and their metadata in Chroma. Chroma uses the configured embedding function to create vectors.
 
-### Step 9 — Download Wikipedia Articles in `src/ingest.py`
+### Step 9 — Download Wikipedia Articles in `src/run_ingestion.py`
 
 The project selected six articles:
 
@@ -353,7 +353,7 @@ MERGE (article)-[:HAS_CHUNK]->(chunk)
 Run ingestion from the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m src.ingest
+.\.venv\Scripts\python.exe -m src.run_ingestion
 ```
 
 ### Step 12 — Inspect the Graph Entirely from Python
@@ -414,7 +414,7 @@ The related-article query was adjusted to match both `HAS_TOPIC` and `MENTIONS_T
 
 The topic map used in this learning stage is explicitly supplied by the program. It is not an automatic fact-extraction model; the chosen concepts should be reviewed for accuracy.
 
-### Step 16 — Update `src/query.py` for Hybrid Retrieval
+### Step 16 — Update `src/run_query.py` for Hybrid Retrieval
 
 The query script first asks the user for a question. It then uses Chroma to retrieve four direct chunks and extracts unique article titles from their metadata.
 
@@ -436,7 +436,7 @@ The user-facing output is organized into:
 
 ### Step 17 — Collect Evidence and Generate an Answer
 
-The final version of `src/query.py` imports `ChatOllama`, `SystemMessage`, and `HumanMessage`. It gathers direct Chroma chunks and selected chunks from graph-retrieved articles, builds a context string, and sends the question and evidence to Ollama.
+The final version of `src/run_query.py` imports `ChatOllama`, `SystemMessage`, and `HumanMessage`. It gathers direct Chroma chunks and selected chunks from graph-retrieved articles, builds a context string, and sends the question and evidence to Ollama.
 
 The system instruction tells the model to answer from supplied evidence, avoid inventing facts, cite article titles and URLs when available, and state when the evidence is insufficient. The chat call is:
 
@@ -452,11 +452,11 @@ print(response.content)
 | Purpose | Command |
 |---|---|
 | Verify Neo4j connection | `.\.venv\Scripts\python.exe -c "from src.graph_store import verify_graph_connection; verify_graph_connection()"` |
-| Download and index articles | `.\.venv\Scripts\python.exe -m src.ingest` |
+| Download and index articles | `.\.venv\Scripts\python.exe -m src.run_ingestion` |
 | Inspect node and relationship counts | `.\.venv\Scripts\python.exe -m src.inspect_graph` |
 | Test article-to-topic and article-to-chunk traversal | `.\.venv\Scripts\python.exe -m src.test_article_context` |
 | Test related article traversal | `.\.venv\Scripts\python.exe -m src.test_related_articles` |
-| Run the full retrieval and answer pipeline | `.\.venv\Scripts\python.exe -m src.query` |
+| Run the full retrieval and answer pipeline | `.\.venv\Scripts\python.exe -m src.run_query` |
 
 ## 6. The Observed End-to-End Behavior
 
@@ -500,7 +500,45 @@ One observed answer correctly described machine learning as a field within artif
 - Use a smaller chat model if needed, while keeping the embedding model unchanged for an already indexed collection.
 - Check CPU and memory usage while the model is generating.
 
-## 9. Summary
+## 9. Limitations
+
+- **Small, fixed dataset:** The ingestion pipeline currently indexes six Wikipedia articles. Answers are therefore limited to what appears in that collection and cannot cover topics outside it.
+- **Wikipedia snapshot and extraction limits:** Ingestion downloads article extracts at the time the pipeline runs. It does not continuously track revisions, and the Wikipedia API extract may omit material that appears elsewhere on a page.
+- **Slow local processing:** Wikipedia requests, Ollama embedding calls, Chroma searches, Neo4j traversal, and local chat generation all add waiting time. Answer generation is especially slow on a CPU or with a large chat model.
+- **Ongoing local services are required:** Both Ollama and Neo4j must be running, and the configured models must already be installed. Ollama, Neo4j Desktop, and Chroma need compatible local resources and storage.
+- **Manual topic relationships:** `MENTIONS_TOPIC` links are supplied by a static topic map in `src/add_topic_relationships.py`. They are not inferred or verified automatically, so incorrect or incomplete mappings can affect graph retrieval.
+- **Chunk-based retrieval:** Chroma searches text chunks rather than complete articles. A nearby chunk may contain words related to the question but not enough context to answer it accurately.
+- **Limited graph expansion:** The current query pipeline retrieves direct chunks plus article context and related-article chunks. It does not perform a general multi-hop reasoning engine or guarantee that every relevant passage is included.
+- **Direct evidence is not fact-checked:** The system groups retrieved text under labels such as `Direct evidence` and `Graph evidence`. It does not independently verify that a statement is true, resolve conflicting sources, or distinguish a paraphrase from an exact claim.
+- **Generated answers may be incomplete:** The chat model is instructed to use supplied evidence and admit missing information, but its response can still omit relevant details or overstate a connection. Answers should be checked against the displayed article text and URL.
+- **Not a production security setup:** Neo4j credentials are stored in local configuration, and the project has no authentication layer, authorization model, telemetry, deployment controls, or secret manager.
+- **Report and history growth:** Every answered query is appended to `outputs/query_history.jsonl`, and the HTML report is regenerated. This is convenient for a learning project but not suitable for unlimited query history without archival or retention controls.
+
+## 10. Future Improvements
+
+- **Expand direct-evidence provenance:** Preserve exact source passages, chunk IDs, article sections, character offsets, and URLs so each answer statement can be linked to a specific source span.
+- **Build evidence-level citations:** For example, associate a generated claim with:
+
+  ```text
+  Direct evidence 1
+  Article: Machine learning
+  Source: https://en.wikipedia.org/wiki/Machine_learning
+  Claim: "Machine learning is a field of study in artificial intelligence (AI) concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data."
+  ```
+
+  The citation UI and answer prompt could then require the model to label claims with their evidence number rather than only mentioning an article title.
+- **Verify evidence support automatically:** Add a post-generation check that compares each answer claim with the retrieved source chunks and flags unsupported, partially supported, or contradictory claims.
+- **Replace the static topic map:** Extract topics from article text with a reviewable LLM or NLP pipeline, then store confidence scores and allow users or curators to approve relationships before they enter the graph.
+- **Make graph settings operational:** Apply `retrieval.graph_hops`, `retrieval.graph_limit`, and `retrieval.vector_k` from `config.yaml` consistently instead of keeping values as hardcoded defaults in the query script.
+- **Improve incremental ingestion:** Detect Wikipedia revisions, avoid reprocessing unchanged chunks, and update or remove obsolete graph nodes and vector entries.
+- **Add retrieval evaluation:** Create a labeled question-and-answer set that measures whether the pipeline finds the correct chunks, related articles, evidence-supported claims, and final answer.
+- **Improve indexing performance:** Batch Ollama embeddings and Neo4j writes, show progress, support resumable ingestion, and cache repeated article or embedding requests.
+- **Improve answer speed and quality:** Compare smaller and larger Ollama models, benchmark CPU and GPU runs, add optional reranking, and reduce unnecessary evidence while preserving citations.
+- **Increase dataset coverage:** Add more Wikipedia topics and support selecting or updating a configurable article list for each project.
+- **Move to production configuration:** Read credentials and model settings from environment variables or a secret manager, validate configuration on startup, and add application-level authentication if the tool is deployed.
+- **Add safer report storage:** Provide configurable retention and export options for query history and HTML reports.
+
+## 11. Summary
 
 The project keeps each technology focused on its strengths:
 
