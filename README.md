@@ -535,7 +535,6 @@ One observed answer correctly described machine learning as a field within artif
 - **Improve indexing performance:** Batch Ollama embeddings and Neo4j writes, show progress, support resumable ingestion, and cache repeated article or embedding requests.
 - **Improve answer speed and quality:** Compare smaller and larger Ollama models, benchmark CPU and GPU runs, add optional reranking, and reduce unnecessary evidence while preserving citations.
 - **Increase dataset coverage:** Add more Wikipedia topics and support selecting or updating a configurable article list for each project.
-- **Move to production configuration:** Read credentials and model settings from environment variables or a secret manager, validate configuration on startup, and add application-level authentication if the tool is deployed.
 - **Add safer report storage:** Provide configurable retention and export options for query history and HTML reports.
 
 ## 11. Summary
